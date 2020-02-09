@@ -15,10 +15,38 @@ fn write_file(message: &Vec<u8>, filename: &String) -> std::result::Result<(), s
     Ok(())
 
 }
+
+fn get_hidden_message(data: Vec<u8>) -> Vec<u8> {
+    let mut temp :u8 = 0;
+    let mut ansr : Vec<u8> = Vec::new();
+    for i in 0..data.len() {
+        if i % 7 == 6 {
+            temp |= 0b0100_0000 & (data[i]);
+            ansr.push(temp);
+            if temp == 0 {
+                break;
+            }
+            temp = 0;
+        } else {
+            temp |= ((0b0010_0000) >>  i % 7) & (data[i])
+        }
+    }
+    return ansr;
+}
+
 fn print_hidden_message(filename: &String){
 
 }
-fn hide_message(filename: &String, message: &String) {}
+
+fn hide_message(filename: &String, message: &String) {
+    let mut data : Vec<u8> = Vec::new();
+    read_file(filename, &mut data);
+    if data.len() < message.len() {
+        eprintln!("We can't fit this message in our file.");
+    }
+    // If we can't fit our message in the file, lets abort.
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.len() {
@@ -35,6 +63,4 @@ fn main() {
             eprintln!("Run this program with 1-2 arguments")
         },
     }
-
-    println!("Hello, world!");
 }
