@@ -31,6 +31,9 @@ fn get_hidden_message(data: &[u8]) -> Vec<u8> {
     for i in 0..data.len() {
         if i % 8 == 7 {
             temp |= 0b000_0001 & (data[i]);
+            if(!temp.is_ascii()) {
+                println!("NOT ASCII");
+            }
             if temp == 0 {
                 break;
             }
@@ -46,7 +49,7 @@ fn get_hidden_message(data: &[u8]) -> Vec<u8> {
 fn print_hidden_message(filename: &String){
     let mut data : Vec<u8> = Vec::new();
     read_file(filename, &mut data);
-    data = get_hidden_message(&data[14..]);
+    data = get_hidden_message(&data[13..]);
     for item in  &data {
         print!("{}", *item as char);
     }
