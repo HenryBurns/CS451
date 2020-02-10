@@ -6,6 +6,7 @@ use std::io::Write;
 fn read_file(filename: &str, buffer: &mut Vec<u8>) -> std::result::Result<(), std::io::Error> {
     let mut f = File::open(filename)?;
     f.read_to_end(buffer)?;
+    print_file(&buffer);
     Ok(())
 }
 
@@ -13,29 +14,43 @@ fn write_file(message: &Vec<u8>, filename: &String) -> std::result::Result<(), s
     let mut f = OpenOptions::new().write(true).create(true).truncate(true).open(filename)?;
     f.write(message)?;
     Ok(())
-
 }
 
-fn get_hidden_message(data: Vec<u8>) -> Vec<u8> {
+fn print_file(data: &Vec<u8>) {
+    for i in 0 .. data.len() {
+        print!("{:2x} ", data[i]);
+        if i % 8 == 7 {
+            println!("");
+        }
+    }
+}
+
+fn get_hidden_message(data: &[u8]) -> Vec<u8> {
     let mut temp :u8 = 0;
     let mut ansr : Vec<u8> = Vec::new();
     for i in 0..data.len() {
-        if i % 7 == 6 {
-            temp |= 0b0100_0000 & (data[i]);
-            ansr.push(temp);
+        if i % 8 == 7 {
+            temp |= 0b000_0001 & (data[i]);
             if temp == 0 {
                 break;
             }
+            ansr.push(temp);
             temp = 0;
         } else {
-            temp |= ((0b0010_0000) >>  i % 7) & (data[i])
+            temp |= ((0b0000_0001 & (data[i])) <<  7 - (i % 8))
         }
     }
     return ansr;
 }
 
 fn print_hidden_message(filename: &String){
-
+    let mut data : Vec<u8> = Vec::new();
+    read_file(filename, &mut data);
+    data = get_hidden_message(&data[14..]);
+    for item in  &data {
+        print!("{}", *item as char);
+    }
+    println!("");
 }
 
 fn hide_message(filename: &String, message: &String) {
