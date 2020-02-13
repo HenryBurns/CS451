@@ -2,25 +2,53 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::io::Read;
 use std::process;
-//use std::fs::OpenOptions;
-//use std::io::Write;
 
-fn get_start(buffer: &Vec<u8>) -> usize {
+fn get_start(buffer: &Vec<u8>, start: &mut usize) -> bool {
     let mut ansr = 0;
-    while buffer[ansr] != ('\n' as u8) {
+    if buffer[0] != 'P' as u8 {
+        eprintln!("first character wasn't P");
+        return false;
+    }
+    else if buffer[1] != ('3' as u8) && buffer[1] != ('6' as u8) {
+        eprintln!("second character wasn't 3 or 6, Char: {}", buffer[1] as char);
+        return false;
+    }
+    // Read P6 or P3
+    ansr += 3;
+    while buffer[ansr] != ('\n' as u8) && buffer[ansr] != (' ' as u8) {
+        if buffer[ansr] < '0' as u8 || buffer[ansr] > '9' as u8 {
+            eprintln!("Width contained non numbers. Num: {}", buffer[ansr]);
+            return false;
+        }
         ansr += 1;
     }
     ansr += 1;
-    //Add the width and the height
-    while buffer[ansr] != ('\n' as u8) {
+
+    // This gets us past width
+
+    while buffer[ansr] != ('\n' as u8) && buffer[ansr] != (' ' as u8) {
+        if buffer[ansr] < '0' as u8 || buffer[ansr] > '9' as u8 {
+            eprintln!("Height contained non numbers");
+            return false;
+        }
         ansr += 1;
     }
     ansr += 1;
-    while buffer[ansr] != ('\n' as u8) {
+
+    // This gets us past height
+
+    while buffer[ansr] != ('\n' as u8) && buffer[ansr] != (' ' as u8) {
+        if buffer[ansr] < '0' as u8 || buffer[ansr] > '9' as u8 {
+            eprintln!("Pixel format contained non numbers");
+            return false;
+        }
         ansr += 1;
     }
     ansr += 1;
-    return ansr;
+    // This should get us past pixel format to the actual data
+
+    *start = ansr;
+    return true;
 }
 
 fn read_file(filename: &str, buffer: &mut Vec<u8>) -> std::result::Result<(), std::io::Error> {
@@ -28,14 +56,6 @@ fn read_file(filename: &str, buffer: &mut Vec<u8>) -> std::result::Result<(), st
     f.read_to_end(buffer)?;
     Ok(())
 }
-
-/*
-fn write_file(message: &Vec<u8>, filename: &String) -> std::result::Result<(), std::io::Error> {
-    let mut f = OpenOptions::new().write(true).create(true).truncate(true).open(filename)?;
-    f.write(message)?;
-    Ok(())
-}
-*/
 
 fn print_file(data: &Vec<u8>) {
     let stdout = io::stdout();
@@ -46,6 +66,7 @@ fn print_file(data: &Vec<u8>) {
 fn get_hidden_message(data: &[u8]) -> Vec<u8> {
     let mut temp :u8 = 0;
     let mut ansr : Vec<u8> = Vec::new();
+    let mut found_null = false;
     for i in 0..data.len() {
         if i % 8 == 7 {
             temp |= 0b000_0001 & (data[i]);
@@ -53,7 +74,7 @@ fn get_hidden_message(data: &[u8]) -> Vec<u8> {
                 //eprintln!("NOT ASCII");
             }
             if temp == 0 {
-                //eprintln!("Found null byte at {}", i);
+                found_null = true;
                 break;
             }
             ansr.push(temp);
@@ -62,13 +83,21 @@ fn get_hidden_message(data: &[u8]) -> Vec<u8> {
             temp |= (0b0000_0001 & (data[i])) <<  7 - (i % 8)
         }
     }
+    if !found_null {
+        eprintln!("This message wasn't terminated by a null character");
+    }
     return ansr;
 }
 
 fn print_hidden_message(filename: &String){
     let mut data : Vec<u8> = Vec::new();
     read_file(filename, &mut data).expect("We couldn't read the file");
-    let start = get_start(&data);
+    let mut start = 0;
+    let is_valid = get_start(&data, &mut start);
+    if !is_valid {
+        eprintln!("This image has an invalid header");
+        process::abort();
+    }
     data = get_hidden_message(&data[start..]);
     for item in  &data {
         print!("{}", *item as char);
@@ -77,7 +106,12 @@ fn print_hidden_message(filename: &String){
 }
 
 fn can_fit_message(data : & Vec<u8>, message: &String) -> bool{
-    let start = get_start(&data);
+    let mut start = 0;
+    let is_valid = get_start(&data, &mut start);
+    if !is_valid {
+        eprintln!("This image has an invalid header");
+        process::abort();
+    }
     if (data.len() - start) / 8 < message.len() + 1 { // + 1 for \0
         eprintln!("We can't fit this message in our file.");
         return false;
@@ -94,7 +128,12 @@ fn hide_message(filename: &String, message: &String) {
         eprintln!("We can't fit the message in this image file.");
         process::abort();
     }
-    let start = get_start(&data);
+    let mut start = 0;
+    let is_valid = get_start(&data, &mut start);
+    if !is_valid {
+        eprintln!("This image has an invalid header");
+        process::abort();
+    }
     let mut offset = 0;
     let mut total = 0;
 
@@ -120,7 +159,6 @@ fn hide_message(filename: &String, message: &String) {
     }
 
     print_file(&data)
-    //write_file(&data, "./output.ppm").expect("Error writing to file");
 }
 
 fn is_one(c:u8, bit:usize)-> bool {
