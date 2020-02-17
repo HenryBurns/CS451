@@ -1,23 +1,27 @@
 use std::fs::File;
+use std::str;
 use std::io::{self, Write};
 use std::io::Read;
 use std::process;
 
 fn get_start(buffer: &Vec<u8>, start: &mut usize) -> bool {
+
     let mut ansr = 0;
     if buffer[0] != 'P' as u8 {
         eprintln!("first character wasn't P");
         return false;
     }
+
     else if buffer[1] != ('3' as u8) && buffer[1] != ('6' as u8) {
         eprintln!("second character wasn't 3 or 6, Char: {}", buffer[1] as char);
         return false;
     }
+
     // Read P6 or P3
     ansr += 3;
     while buffer[ansr] != ('\n' as u8) && buffer[ansr] != (' ' as u8) {
         if buffer[ansr] < '0' as u8 || buffer[ansr] > '9' as u8 {
-            eprintln!("Width contained non numbers. Num: {}", buffer[ansr]);
+            eprintln!("Header width contained non numbers. Val: {}", buffer[ansr] as char);
             return false;
         }
         ansr += 1;
@@ -28,7 +32,7 @@ fn get_start(buffer: &Vec<u8>, start: &mut usize) -> bool {
 
     while buffer[ansr] != ('\n' as u8) && buffer[ansr] != (' ' as u8) {
         if buffer[ansr] < '0' as u8 || buffer[ansr] > '9' as u8 {
-            eprintln!("Height contained non numbers");
+            eprintln!("Header height contained non numbers. Val: {}", buffer[ansr] as char);
             return false;
         }
         ansr += 1;
@@ -39,12 +43,13 @@ fn get_start(buffer: &Vec<u8>, start: &mut usize) -> bool {
 
     while buffer[ansr] != ('\n' as u8) && buffer[ansr] != (' ' as u8) {
         if buffer[ansr] < '0' as u8 || buffer[ansr] > '9' as u8 {
-            eprintln!("Pixel format contained non numbers");
+            eprintln!("Pixel format contained non numbers. Val: {}", buffer[ansr] as char);
             return false;
         }
         ansr += 1;
     }
     ansr += 1;
+
     // This should get us past pixel format to the actual data
 
     *start = ansr;
@@ -54,13 +59,14 @@ fn get_start(buffer: &Vec<u8>, start: &mut usize) -> bool {
 fn read_file(filename: &str, buffer: &mut Vec<u8>) -> std::result::Result<(), std::io::Error> {
     let mut f = File::open(filename)?;
     f.read_to_end(buffer)?;
+    buffer.pop(); // We read in 1 extra byte for some reason
     Ok(())
 }
 
 fn print_file(data: &Vec<u8>) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-    handle.write_all(data);
+    handle.write_all(data).expect("There was a problem with writing output to stdout");
 }
 
 fn get_hidden_message(data: &[u8]) -> Vec<u8> {
@@ -85,6 +91,7 @@ fn get_hidden_message(data: &[u8]) -> Vec<u8> {
     }
     if !found_null {
         eprintln!("This message wasn't terminated by a null character");
+        process::abort();
     }
     return ansr;
 }
@@ -98,11 +105,12 @@ fn print_hidden_message(filename: &String){
         eprintln!("This image has an invalid header");
         process::abort();
     }
+
     data = get_hidden_message(&data[start..]);
+
     for item in  &data {
         print!("{}", *item as char);
     }
-    println!("");
 }
 
 fn can_fit_message(data : & Vec<u8>, message: &String) -> bool{
@@ -119,10 +127,18 @@ fn can_fit_message(data : & Vec<u8>, message: &String) -> bool{
     return true;
 }
 
-fn hide_message(filename: &String, message: &String) {
+fn hide_message(filename: &String, message_filename: &String) {
     let mut data : Vec<u8> = Vec::new();
+    let mut message_data : Vec<u8> = Vec::new();
+    //let message_str = read_string(message_filename, &mut message_data);
+    read_file(message_filename, &mut message_data).expect("We couldn't read the input file");
+
+    let message = match str::from_utf8(&message_data[..]) {
+        Ok(v) => String::from(v),
+        Err(_v) => panic!("Invalid input provided"),
+    };
     read_file(filename, &mut data).expect("We couldn't read the file");
-    eprintln!("Message: {}, Message len: {}", message, message.len());
+    
     // If we can't fit our message in the file, lets abort.
     if ! can_fit_message(&data, &message) {
         eprintln!("We can't fit the message in this image file.");
@@ -135,24 +151,22 @@ fn hide_message(filename: &String, message: &String) {
         process::abort();
     }
     let mut offset = 0;
-    let mut total = 0;
+    let mut total = start;
 
-    for c in message.chars() {
+    for c in &message_data {
         if ! c.is_ascii() {
-            eprintln!("NO MORE ASCII! >:(");
+            eprintln!("We are reading a non ascii charater");
         }
-        total = start + offset;
         for indx in (total)..(total + 8) {
-            if is_one(c as u8, indx-total) {
+            if is_one(*c, indx-total) {
                 data[indx] |= 0b0000_0001;
             } else {
                 data[indx] &= 0b1111_1110;
             }
         }
         offset += 8;
+        total = start + offset;
     }
-    offset += 8;
-    total = start + offset;
 
     for indx in (total)..(total + 8 ) {
         data[indx] &= 0b1111_1110;
@@ -163,7 +177,7 @@ fn hide_message(filename: &String, message: &String) {
 
 fn is_one(c:u8, bit:usize)-> bool {
     if bit > 7 {
-        eprintln!("What the fuck");
+        eprintln!("Tried to get a bit beyond the end of this u8");
     }
     if c & (0b1000_0000 >> bit) != 0 {
         return true;
@@ -175,7 +189,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.len() {
         1 => {
-            eprintln!("cargo run <path/to/PPM/with/hidden/message>\ncargo run <path/to/PPM> 'Message to hide'")
+            eprintln!("Usage1: cargo run <path/to/PPM/with/hidden/message>\nUsage2: cargo run <path/to/PPM> <path/to/input/file>")
         },
         2 => {
             print_hidden_message(&args[1])
