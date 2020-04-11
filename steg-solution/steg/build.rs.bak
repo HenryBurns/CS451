@@ -1,0 +1,13 @@
+// use std::io::fs;
+use std::env;
+
+fn main() -> std::io::Result<()> {
+    // let from = Path::new("./liblibsteg.rlib");
+    // let to = Path::new("/tmp/rust-crates/b/blah/liba-b2092cdbfc1953bd.rlib");
+    // fs::copy(&from, &to).unwrap();
+    let path = env::current_dir()?;
+    // println!("The current directory is {}", path.display());
+    println!("{}", format!("cargo:rustc-flags=-L {}/lib", path.display()));
+
+    Ok(())
+}
