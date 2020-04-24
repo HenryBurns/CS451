@@ -20,12 +20,14 @@ impl Drop for ThreadPool {
         //
         // 1. Send shutdown messages
         for _ in &mut self.workers {
-            self.sender.send(Message::Shutdown);
+            self.sender.send(Message::Shutdown).unwrap();
         }
 
         // 2. join all threads
-        for unit in &mut self.workers {
-            unit.my_thread.take().unwrap().join().unwrap();
+        for worker in &mut self.workers {
+            if let Some(thread) = worker.my_thread.take() {
+                thread.join().unwrap();
+            }
         }
     }
 }
@@ -54,8 +56,7 @@ impl ThreadPool {
         }
     }
     pub fn execute<F>(&self, f: F)
-    where
-        F: FnOnce() + Send + 'static,
+    where F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
 
@@ -79,13 +80,13 @@ impl<F: FnOnce()> FnBox for F {
 }
 
 impl Worker {
-    fn new(new_id : usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+    fn new(new_id : usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
         // We dont know how to deal with this yet
         let id = new_id;
         let my_thread = thread::spawn(move ||{
             loop {
                 // We need a mutex here to prevent race conditions
-                let message = receiver.lock().unwrap().recv();
+                let message = receiver.lock().unwrap().recv().unwrap();
                 //let job = receiver.lock().unwrap().recv().unwrap();
                 //
                 match message {
