@@ -1,0 +1,53 @@
+so to benchmark this program enter
+
+cargo bench
+
+this will run benches/my_benchmark.rs (warning it takes quite some time)
+
+this will run encode  on aux/in/ and output to aux/out/benchOut/,
+which is then decoded.
+
+we are encoding/decoding bible.txt right now.
+
+BENCHMARKING
+============
+
+Encoding
+________
+
+So we do see that the average time decreases slightly when we go from
+increase the number of threads However, we
+swiftly see that number plateu. This is beause our message isn't
+big enough to require more threads than we are allocating. If we used
+a bigger message we would see this speedup continue.
+
+Throughput can been seen in all of the individual tests, and you can see
+that throughput increases as time decreases. (Which makes sense, as we
+are encoding the same number of bytes in less time)
+
+
+Decoding
+________
+
+We see some weird results with decoding where the time increases for threads
+2-4. My best guess as to why this happens, is that there is contention over the
+Hashmap that all the threads insert their result into. 
+
+That still doesn't really explain why 5 threads would be faster than 4.
+My best guess is that something was impacting I/O or disk reading on my laptop
+while I was running the benchmarking for 2-4 threads? This would mean that
+These threads had to block for much longer to get the file handles needed.
+
+
+Overall Remarks
+===============
+
+Overall this stegonography code could be improved in a number of ways.
+
+1. Only read in the header when verifying that a file is a PPM
+2. Use a thread pool instead of creating/destroying excess threads
+3. balance work between threads better so that we don't end up waiting
+   on a single overworked thread.
+4. MMAP the files that we are reading from/writing to, and free them
+   once we are done with all our processing. This will allow us to
+   parse the header, store the file, and access it when we need it.
