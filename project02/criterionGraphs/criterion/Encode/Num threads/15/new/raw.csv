@@ -1,0 +1,11 @@
+group,function,value,throughput_num,throughput_type,sample_measured_value,unit,iteration_count
+Encode,Num threads,15,204439,bytes,1157722563.0,ns,1
+Encode,Num threads,15,204439,bytes,3685060691.0,ns,2
+Encode,Num threads,15,204439,bytes,4194715339.0,ns,3
+Encode,Num threads,15,204439,bytes,6706480167.0,ns,4
+Encode,Num threads,15,204439,bytes,8013939492.0,ns,5
+Encode,Num threads,15,204439,bytes,10473543779.0,ns,6
+Encode,Num threads,15,204439,bytes,11593666165.0,ns,7
+Encode,Num threads,15,204439,bytes,12840459073.0,ns,8
+Encode,Num threads,15,204439,bytes,14577217226.0,ns,9
+Encode,Num threads,15,204439,bytes,16517577048.0,ns,10
